@@ -231,10 +231,89 @@
     </div>
   </div>
 
-  <footer>Autumn Term 2026 — Year 3 spellings · progress is saved on this device</footer>
+  <footer>Autumn Term 2026 — Year 3 spellings · <span id="syncStatus">connecting…</span></footer>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBlJVbJwBHxakLA20gkgO-SlBUskHFTrHA",
+  authDomain: "word-rocket-7b3a5.firebaseapp.com",
+  projectId: "word-rocket-7b3a5",
+  storageBucket: "word-rocket-7b3a5.firebasestorage.app",
+  messagingSenderId: "833151950185",
+  appId: "1:833151950185:web:e025dd738f95f7ede931f8"
+};
+
+const PLAYER_ID = "henry"; // change this if you ever add a second child/profile
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const playerRef = doc(db, "players", PLAYER_ID);
+
+const LOCAL_PROGRESS_KEY = "wordRocketProgress_v1";
+const LOCAL_TIME_KEY = "wordRocketTime_v1";
+
+// in-memory state, hydrated from Firestore (falls back to localStorage if offline)
+const state = {
+  progress: {},                                   // wordKey -> {attempts, correct}
+  time: { unredeemedSeconds: 0, allTimeSeconds: 0 }
+};
+
+function setSyncStatus(text){
+  const el = document.getElementById('syncStatus');
+  if(el) el.textContent = text;
+}
+
+function readLocalFallback(){
+  try{ state.progress = JSON.parse(localStorage.getItem(LOCAL_PROGRESS_KEY)) || {}; }catch(e){ state.progress = {}; }
+  try{ state.time = JSON.parse(localStorage.getItem(LOCAL_TIME_KEY)) || {unredeemedSeconds:0, allTimeSeconds:0}; }catch(e){ state.time = {unredeemedSeconds:0, allTimeSeconds:0}; }
+}
+
+function writeLocalCache(){
+  localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(state.progress));
+  localStorage.setItem(LOCAL_TIME_KEY, JSON.stringify(state.time));
+}
+
+async function hydrateFromCloud(){
+  readLocalFallback(); // have something to show immediately
+  try{
+    const snap = await getDoc(playerRef);
+    if(snap.exists()){
+      const data = snap.data();
+      state.progress = data.progress || {};
+      state.time = data.time || {unredeemedSeconds:0, allTimeSeconds:0};
+      writeLocalCache();
+    }
+    setSyncStatus("synced across devices ☁️");
+  }catch(e){
+    console.warn("Firestore read failed, using local data", e);
+    setSyncStatus("offline — saved on this device only");
+  }
+}
+
+let syncTimer = null;
+function queueCloudSync(){
+  writeLocalCache();
+  if(syncTimer) clearTimeout(syncTimer);
+  setSyncStatus("saving…");
+  syncTimer = setTimeout(async ()=>{
+    try{
+      await setDoc(playerRef, { progress: state.progress, time: state.time, updatedAt: new Date().toISOString() });
+      setSyncStatus("synced across devices ☁️");
+    }catch(e){
+      console.warn("Firestore write failed", e);
+      setSyncStatus("offline — saved on this device only");
+    }
+  }, 600);
+}
+
+function loadProgress(){ return state.progress; }
+function saveProgress(p){ state.progress = p; queueCloudSync(); }
+function loadTime(){ return state.time; }
+function saveTime(t){ state.time = t; queueCloudSync(); }
+
 /* ---------------- DATA ---------------- */
 /* Best-effort transcription from the school's spelling sheet.
    If any word looks off, edit it right here — each week is one simple array. */
@@ -276,16 +355,8 @@ const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","�
 let currentWeekIndex = 0;
 let session = null; // {mode, words:[], index, correctCount, wrong:[]}
 let sessionStartMs = null;
-const STORAGE_KEY = "wordRocketProgress_v1";
-const TIME_KEY = "wordRocketTime_v1";
 
 /* ---------------- TIME / REWARDS ---------------- */
-function loadTime(){
-  try{ return JSON.parse(localStorage.getItem(TIME_KEY)) || {unredeemedSeconds:0, allTimeSeconds:0}; }
-  catch(e){ return {unredeemedSeconds:0, allTimeSeconds:0}; }
-}
-function saveTime(t){ localStorage.setItem(TIME_KEY, JSON.stringify(t)); }
-
 function renderRewards(){
   const t = loadTime();
   const minutes = Math.floor(t.unredeemedSeconds/60);
@@ -314,12 +385,6 @@ function redeemMinutes(){
   renderRewards();
 }
 
-function loadProgress(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }catch(e){ return {}; }
-}
-function saveProgress(p){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
-}
 function wordKey(weekIdx, word){ return weekIdx+"::"+word; }
 
 /* ---------------- INIT ---------------- */
@@ -596,11 +661,20 @@ function quitGame(){
 window.addEventListener('beforeunload', endSessionTimer);
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) endSessionTimer(); });
 
-renderStars();
-currentWeekIndex = pickCurrentWeek();
-renderPath();
-renderHome();
-renderRewards();
+Object.assign(window, {
+  selectWeek, startGame, speak, skipWord, checkAnswer,
+  chooseOption, redeemMinutes, backHome, restartSameMode, quitGame
+});
+
+async function boot(){
+  renderStars();
+  currentWeekIndex = pickCurrentWeek();
+  renderPath();
+  await hydrateFromCloud();
+  renderHome();
+  renderRewards();
+}
+boot();
 </script>
 </body>
 </html>
