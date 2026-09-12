@@ -41,6 +41,30 @@
 
   .wrap{position:relative; z-index:1; max-width:760px; margin:0 auto; padding:22px 18px 60px;}
 
+  @keyframes flyA{0%{transform:translate(-15vw,115vh) rotate(-45deg);}100%{transform:translate(115vw,-15vh) rotate(-45deg);}}
+  @keyframes flyB{0%{transform:translate(115vw,110vh) rotate(-135deg);}100%{transform:translate(-15vw,-15vh) rotate(-135deg);}}
+  @keyframes flyC{0%{transform:translate(-15vw,55vh) rotate(-15deg);}100%{transform:translate(115vw,25vh) rotate(-15deg);}}
+  @keyframes flyD{0%{transform:translate(105vw,-10vh) rotate(135deg);}100%{transform:translate(-15vw,105vh) rotate(135deg);}}
+  .bg-rockets{position:fixed; inset:0; overflow:hidden; z-index:0; pointer-events:none;}
+  .bg-rocket{
+    position:absolute; top:0; left:0; line-height:1;
+    filter:drop-shadow(0 0 10px rgba(255,179,71,.35));
+    animation-timing-function:linear; animation-iteration-count:infinite;
+  }
+  .bg-rocket.r1{font-size:4.2rem; opacity:.16; animation:flyA 26s linear infinite; animation-delay:-2s;}
+  .bg-rocket.r2{font-size:2.6rem; opacity:.12; animation:flyB 34s linear infinite; animation-delay:-14s;}
+  .bg-rocket.r3{font-size:5.4rem; opacity:.14; animation:flyC 40s linear infinite; animation-delay:-6s;}
+  .bg-rocket.r4{font-size:3.2rem; opacity:.13; animation:flyD 30s linear infinite; animation-delay:-20s;}
+  .bg-rocket.r5{font-size:2.2rem; opacity:.1; animation:flyA 22s linear infinite; animation-delay:-11s;}
+
+  .home-fab{
+    position:fixed; top:14px; left:14px; z-index:30; width:48px; height:48px; border-radius:50%;
+    background:var(--panel); border:2px solid var(--flame); color:var(--ink); font-size:1.35rem;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; text-decoration:none;
+    box-shadow:0 4px 0 #b85f1c;
+  }
+  .home-fab:active{transform:translateY(3px); box-shadow:0 1px 0 #b85f1c;}
+
   header{text-align:center; margin-bottom:18px; position:relative;}
   .school-badge{
     position:absolute; top:-2px; right:0; width:54px; height:54px; border-radius:50%;
@@ -212,6 +236,14 @@
 </head>
 <body>
 <div class="stars" id="stars"></div>
+<div class="bg-rockets">
+  <span class="bg-rocket r1">🚀</span>
+  <span class="bg-rocket r2">🚀</span>
+  <span class="bg-rocket r3">🚀</span>
+  <span class="bg-rocket r4">🚀</span>
+  <span class="bg-rocket r5">🚀</span>
+</div>
+<button class="home-fab" onclick="quitGame()" title="Home" aria-label="Home">🏠</button>
 <div class="wrap">
 
   <header>
@@ -227,7 +259,7 @@
 
   <div class="card" id="rewardsCard">
     <h2>🎬 YouTube minutes won</h2>
-    <p class="muted">1 minute of Word Rocket = 1 minute of YouTube</p>
+    <p class="muted">Every correct spelling wins 30 seconds of YouTube</p>
     <div>
       <div class="result-stat" id="earnedMinutes" style="font-size:2.4rem; margin-bottom:0;">0</div>
       <div class="muted" style="margin:0;">minutes ready to spend</div>
@@ -276,7 +308,6 @@
       <button class="btn btn-secondary" onclick="skipWord()">Skip ⏭</button>
       <button class="btn btn-primary" id="checkBtn" onclick="checkAnswer()">Check ✅</button>
     </div>
-    <span class="exit-link" onclick="quitGame()">Leave mission control</span>
   </div>
 
   <div class="card game-screen result-screen" id="resultScreen">
@@ -413,7 +444,7 @@ const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","�
 /* ---------------- STATE ---------------- */
 let currentWeekIndex = 0;
 let session = null; // {mode, words:[], index, correctCount, wrong:[]}
-let sessionStartMs = null;
+const SECONDS_PER_CORRECT = 30;
 
 /* ---------------- TIME / REWARDS ---------------- */
 function renderRewards(){
@@ -421,17 +452,14 @@ function renderRewards(){
   const minutes = Math.floor(t.unredeemedSeconds/60);
   document.getElementById('earnedMinutes').textContent = minutes;
   const allMinutes = Math.floor(t.allTimeSeconds/60);
-  document.getElementById('allTimeStat').textContent = `All-time: ${allMinutes} minute${allMinutes===1?'':'s'} played`;
+  document.getElementById('allTimeStat').textContent = `All-time: ${allMinutes} minute${allMinutes===1?'':'s'} won`;
 }
 
-function endSessionTimer(){
-  if(sessionStartMs === null) return;
-  const elapsed = Math.max(0, Math.round((Date.now() - sessionStartMs)/1000));
+function awardWinTime(){
   const t = loadTime();
-  t.unredeemedSeconds += elapsed;
-  t.allTimeSeconds += elapsed;
+  t.unredeemedSeconds += SECONDS_PER_CORRECT;
+  t.allTimeSeconds += SECONDS_PER_CORRECT;
   saveTime(t);
-  sessionStartMs = null;
   renderRewards();
 }
 
@@ -566,7 +594,6 @@ function startGame(mode){
   const w = WEEKS[currentWeekIndex];
   if(!w.words.length) return;
   session = { mode, words: shuffled(w.words), index:0, stars:0, wrongList:[] };
-  sessionStartMs = Date.now();
   document.getElementById('homeCard').style.display = 'none';
   document.getElementById('rewardsCard').style.display = 'none';
   document.getElementById('resultScreen').classList.remove('active');
@@ -685,8 +712,12 @@ function registerResult(word, isCorrect, skipped){
   }
   progress[key] = stat;
   saveProgress(progress);
-  if(isCorrect) session.stars += 1;
-  else session.wrongList.push(word);
+  if(isCorrect){
+    session.stars += 1;
+    awardWinTime();
+  } else {
+    session.wrongList.push(word);
+  }
 }
 
 function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
@@ -696,7 +727,7 @@ function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
     feedback.textContent = `Skipped — it was "${correctWord}"`;
     feedback.className = 'feedback';
   } else if(isCorrect){
-    feedback.textContent = "Blast off! Correct! 🚀";
+    feedback.textContent = "Blast off! Correct! 🚀 +30s YouTube";
     feedback.className = 'feedback good';
     celebrateStage(stage);
     bumpScore();
@@ -714,7 +745,6 @@ function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
 }
 
 function finishGame(){
-  endSessionTimer();
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('resultScreen').classList.add('active');
   const total = session.words.length;
@@ -750,14 +780,10 @@ function backHome(){
 
 function quitGame(){
   window.speechSynthesis && window.speechSynthesis.cancel();
-  endSessionTimer();
   backHome();
 }
 
 /* ---------------- BOOT ---------------- */
-window.addEventListener('beforeunload', endSessionTimer);
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden) endSessionTimer(); });
-
 Object.assign(window, {
   selectWeek, startGame, speak, skipWord, checkAnswer,
   chooseOption, backHome, restartSameMode, quitGame
