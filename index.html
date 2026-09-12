@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Word Rocket — Spelling Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1B1F3B;
+    --navy-2:#262c52;
+    --panel:#252a4d;
+    --flame:#FFB347;
+    --flame-2:#FF8A3D;
+    --teal:#4ECDC4;
+    --ink:#F7F7FF;
+    --ink-dim:#B9BEE8;
+    --good:#6BCB77;
+    --bad:#FF6B6B;
+    --star:#FFD166;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% 0%, #2c3268 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, #2a2f5c 0%, transparent 50%),
+      var(--navy);
+    color:var(--ink);
+    font-family:'Nunito',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .stars{position:fixed; inset:0; z-index:0; pointer-events:none;}
+  .stars span{
+    position:absolute; width:2px; height:2px; background:#fff; border-radius:50%;
+    opacity:.5; animation:twinkle 3.5s ease-in-out infinite;
+  }
+  @keyframes twinkle{0%,100%{opacity:.15}50%{opacity:.8}}
+
+  .wrap{position:relative; z-index:1; max-width:760px; margin:0 auto; padding:22px 18px 60px;}
+
+  header{text-align:center; margin-bottom:18px;}
+  .logo{font-size:2.4rem; line-height:1;}
+  h1{
+    font-family:'Baloo 2',cursive; font-weight:800; font-size:2rem; margin:6px 0 2px;
+    letter-spacing:.5px;
+  }
+  h1 span{color:var(--flame);}
+  .tagline{color:var(--ink-dim); font-size:.95rem; margin:0;}
+
+  /* Mission path */
+  .path-scroll{overflow-x:auto; padding:14px 4px 18px; margin-bottom:6px; -webkit-overflow-scrolling:touch;}
+  .path{display:flex; gap:10px; min-width:max-content; padding:4px;}
+  .planet{
+    position:relative; flex:0 0 auto; width:64px; height:64px; border-radius:50%;
+    background:var(--panel); border:3px solid #3a4080; display:flex; align-items:center; justify-content:center;
+    font-family:'Baloo 2',cursive; font-weight:700; font-size:1.5rem; cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  .planet small{position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); font-size:.6rem; color:var(--ink-dim); white-space:nowrap; font-family:'Nunito'; font-weight:700;}
+  .planet.done{background:linear-gradient(145deg,#3a7d5c,#2e6a4c); border-color:var(--good);}
+  .planet.current{border-color:var(--flame); box-shadow:0 0 0 4px rgba(255,179,71,.25); transform:scale(1.12);}
+  .planet.holiday{background:#3a3060; border-color:#5a4d90; font-size:1.1rem;}
+  .planet:hover{transform:scale(1.08);}
+
+  /* Card */
+  .card{
+    background:var(--panel); border-radius:22px; padding:22px; margin-bottom:16px;
+    border:1px solid #363c6e;
+  }
+  .card h2{font-family:'Baloo 2',cursive; margin:0 0 4px; font-size:1.3rem;}
+  .muted{color:var(--ink-dim); font-size:.9rem; margin:0 0 14px;}
+
+  .mode-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
+  @media(max-width:560px){.mode-grid{grid-template-columns:1fr;}}
+  .mode-btn{
+    background:var(--navy-2); border:2px solid #3a4080; border-radius:16px; color:var(--ink);
+    padding:16px 10px; font-family:'Baloo 2',cursive; font-size:1.05rem; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .mode-btn .emoji{font-size:1.8rem;}
+  .mode-btn:hover{border-color:var(--flame); background:#2c3268;}
+  .mode-btn small{font-family:'Nunito'; font-weight:600; color:var(--ink-dim); font-size:.72rem;}
+
+  .wordlist{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .chip{
+    background:var(--navy-2); border:1px solid #3a4080; border-radius:999px; padding:6px 12px;
+    font-size:.88rem; display:flex; align-items:center; gap:6px;
+  }
+  .chip button{background:none;border:none;color:var(--teal); cursor:pointer; font-size:1rem; line-height:1;}
+  .chip.weak{border-color:var(--bad);}
+  .chip.mastered{border-color:var(--good);}
+
+  /* Game screen */
+  .game-screen{display:none;}
+  .game-screen.active{display:block;}
+  .progress-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-family:'Baloo 2',cursive; font-size:.95rem; color:var(--ink-dim);}
+  .progress-bar{height:10px; background:var(--navy-2); border-radius:999px; overflow:hidden; margin-bottom:18px;}
+  .progress-fill{height:100%; background:linear-gradient(90deg,var(--flame-2),var(--flame)); width:0%; transition:width .3s ease;}
+
+  .word-stage{
+    background:var(--navy-2); border-radius:18px; padding:34px 20px; text-align:center; margin-bottom:16px;
+    min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  }
+  .big-word{font-family:'Baloo 2',cursive; font-size:2.2rem; letter-spacing:2px;}
+  .speak-btn{
+    background:var(--teal); border:none; color:#0a2b28; width:52px; height:52px; border-radius:50%;
+    font-size:1.4rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 0 #2f8d85;
+  }
+  .speak-btn:active{transform:translateY(3px); box-shadow:0 1px 0 #2f8d85;}
+
+  input.answer{
+    width:100%; font-family:'Baloo 2',cursive; font-size:1.4rem; text-align:center; padding:14px;
+    border-radius:14px; border:2px solid #3a4080; background:var(--navy); color:var(--ink); margin-bottom:14px;
+  }
+  input.answer:focus{outline:none; border-color:var(--flame);}
+
+  .choices{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
+  .choice-btn{
+    background:var(--navy); border:2px solid #3a4080; color:var(--ink); border-radius:14px; padding:14px;
+    font-family:'Baloo 2',cursive; font-size:1.15rem; cursor:pointer;
+  }
+  .choice-btn:hover{border-color:var(--flame);}
+  .choice-btn.correct{background:rgba(107,203,119,.25); border-color:var(--good);}
+  .choice-btn.wrong{background:rgba(255,107,107,.25); border-color:var(--bad);}
+
+  .actions{display:flex; gap:10px;}
+  .btn{
+    flex:1; padding:14px; border-radius:14px; border:none; font-family:'Baloo 2',cursive; font-size:1.05rem;
+    cursor:pointer; color:#12162e;
+  }
+  .btn-primary{background:linear-gradient(180deg,var(--flame),var(--flame-2)); box-shadow:0 4px 0 #b85f1c;}
+  .btn-primary:active{transform:translateY(3px); box-shadow:0 1px 0 #b85f1c;}
+  .btn-secondary{background:var(--navy-2); color:var(--ink); border:2px solid #3a4080;}
+  .feedback{min-height:30px; text-align:center; font-family:'Baloo 2',cursive; font-size:1.1rem; margin-bottom:8px;}
+  .feedback.good{color:var(--good);}
+  .feedback.bad{color:var(--bad);}
+  .exit-link{display:block; text-align:center; margin-top:6px; color:var(--ink-dim); text-decoration:underline; cursor:pointer; font-size:.85rem;}
+
+  /* Results */
+  .result-screen{text-align:center;}
+  .result-stars{font-size:2.6rem; margin:6px 0 12px;}
+  .result-stat{font-family:'Baloo 2',cursive; font-size:1.6rem; margin-bottom:4px;}
+
+  footer{text-align:center; color:var(--ink-dim); font-size:.8rem; margin-top:20px;}
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div class="wrap">
+
+  <header>
+    <div class="logo">🚀</div>
+    <h1>Word <span>Rocket</span></h1>
+    <p class="tagline">Blast through this week's spellings, mission by mission.</p>
+  </header>
+
+  <div class="path-scroll">
+    <div class="path" id="path"></div>
+  </div>
+
+  <div class="card" id="homeCard">
+    <h2 id="weekTitle">This week's mission</h2>
+    <p class="muted" id="weekMeta">Loading…</p>
+
+    <div class="mode-grid">
+      <button class="mode-btn" onclick="startGame('learn')">
+        <span class="emoji">👀</span> Look &amp; Type
+        <small>See it, then type it from memory</small>
+      </button>
+      <button class="mode-btn" onclick="startGame('listen')">
+        <span class="emoji">🎧</span> Listen &amp; Land
+        <small>Hear it, then spell it</small>
+      </button>
+      <button class="mode-btn" onclick="startGame('choice')">
+        <span class="emoji">🛰️</span> Pick the Planet
+        <small>Choose the correct spelling</small>
+      </button>
+    </div>
+
+    <div style="margin-top:18px;">
+      <p class="muted" style="margin-bottom:8px;">This week's words (tap 🔊 to hear one):</p>
+      <div class="wordlist" id="wordlist"></div>
+    </div>
+  </div>
+
+  <div class="card game-screen" id="gameScreen">
+    <div class="progress-row">
+      <span id="progressLabel">Word 1 of 10</span>
+      <span id="scoreLabel">⭐ 0</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="word-stage" id="wordStage"></div>
+
+    <div id="feedback" class="feedback"></div>
+    <div id="answerArea"></div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="skipWord()">Skip ⏭</button>
+      <button class="btn btn-primary" id="checkBtn" onclick="checkAnswer()">Check ✅</button>
+    </div>
+    <span class="exit-link" onclick="quitGame()">Leave mission control</span>
+  </div>
+
+  <div class="card game-screen result-screen" id="resultScreen">
+    <h2>Mission report 🛰️</h2>
+    <div class="result-stars" id="resultStars"></div>
+    <div class="result-stat" id="resultScoreText"></div>
+    <p class="muted" id="resultWeakWords"></p>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="backHome()">Back to base</button>
+      <button class="btn btn-primary" onclick="restartSameMode()">Fly again 🚀</button>
+    </div>
+  </div>
+
+  <footer>Autumn Term 2026 — Year 3 spellings · progress is saved on this device</footer>
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+/* Best-effort transcription from the school's spelling sheet.
+   If any word looks off, edit it right here — each week is one simple array. */
+const WEEKS = [
+  { wb:"2026-09-07", test:"14/9/26", list:10,
+    words:["gardening","gardener","limited","limiting","developed","listening","permitted","regretting","listened","covered","forbidden","propelled","covering","equipped","accident","accidentally","actual","actually","island","library"] },
+  { wb:"2026-09-14", test:"21/9/26", list:11,
+    words:["forgetting","forgotten","beginning","preferred","permitted","regretting","clearly","hourly","quickly","forbidden","propelled","equipped","address","although","knowledge"] },
+  { wb:"2026-09-21", test:"28/9/26", list:16,
+    words:["calmly","exactly","deadly","bravely","gladly","deeply","responsibly","wrinkly","possibly","durably","address","although","knowledge","breath","breathe","purpose"] },
+  { wb:"2026-09-28", test:"5/10/26", list:21,
+    words:["gently","simply","humbly","terribly","incredibly","responsibly","wrinkly","possibly","durably","breath","breathe","purpose","learn"] },
+  { wb:"2026-10-05", test:"12/10/26", list:23,
+    words:["truly","daily","slyly","shyly","fully","wholly","coyly","happily","duly","appear","disappear","learn"] },
+  { wb:"2026-10-12", test:"19/10/26", list:22,
+    words:["basically","frantically","historically","dramatically","automatically","tragically","magically","specifically","logically","bicycle","build","material"] },
+  { wb:"2026-10-19", test:"", list:19,
+    words:["arrival","comical","emotional","national","magical","personal","optional","survival","tropical","arrive","believe","length"] },
+  { wb:"2026-10-26", test:"", list:null, holiday:true, words:[] },
+  { wb:"2026-11-02", test:"9/11/26", list:20,
+    words:["battle","article","struggle","possible","capable","settle","humble","terrible","example","busy","business","medicine"] },
+  { wb:"2026-11-09", test:"16/11/26", list:4,
+    words:["measure","treasure","pleasure","enclosure","pressure","composure","exposure","closure","calendar","caught","mention","minute"] },
+  { wb:"2026-11-16", test:"23/11/26", list:5,
+    words:["creature","furniture","picture","adventure","capture","nature","future","centre","century"] },
+  { wb:"2026-11-23", test:"30/11/26", list:25,
+    words:["teacher","catcher","richer","stretcher","watcher","butcher","preacher","cruncher","scorcher","certain","circle","natural"] },
+  { wb:"2026-11-30", test:"7/12/26", list:31,
+    words:["confusion","division","invasion","erosion","collision","decision","fusion","revision","consider","continue","naughty"] },
+  { wb:"2026-12-07", test:"14/12/26", list:7,
+    words:["decide","describe","often","disobey","disagree","disapprove","dislike","disappear","dislocate","answer","complete","notice"] },
+  { wb:"2026-12-14", test:"5/1/27", list:8,
+    words:["redo","return","refresh","reaction","reappear","revenge","review","replay","redecorate","rebound","disagree","different","difficult","opposite"] },
+];
+
+const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","🌠","🔭","🌞","🌛","💫","🧊","🌈"];
+
+/* ---------------- STATE ---------------- */
+let currentWeekIndex = 0;
+let session = null; // {mode, words:[], index, correctCount, wrong:[]}
+const STORAGE_KEY = "wordRocketProgress_v1";
+
+function loadProgress(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveProgress(p){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+}
+function wordKey(weekIdx, word){ return weekIdx+"::"+word; }
+
+/* ---------------- INIT ---------------- */
+function pickCurrentWeek(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  let idx = 0;
+  for(let i=0;i<WEEKS.length;i++){
+    const wb = new Date(WEEKS[i].wb+"T00:00:00");
+    if(wb <= today) idx = i;
+  }
+  return idx;
+}
+
+function renderStars(){
+  const el = document.getElementById('stars');
+  let html='';
+  for(let i=0;i<60;i++){
+    const top = Math.random()*100, left=Math.random()*100, delay=(Math.random()*3.5).toFixed(2);
+    html += `<span style="top:${top}%; left:${left}%; animation-delay:${delay}s;"></span>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderPath(){
+  const el = document.getElementById('path');
+  el.innerHTML = WEEKS.map((w,i)=>{
+    const cls = w.holiday ? "planet holiday" : (i===currentWeekIndex ? "planet current" : (i<currentWeekIndex ? "planet done" : "planet"));
+    const label = w.holiday ? "Holiday" : "WB " + formatShort(w.wb);
+    const emoji = w.holiday ? "🎄" : PLANET_EMOJI[i % PLANET_EMOJI.length];
+    return `<div class="${cls}" onclick="selectWeek(${i})">${emoji}<small>${label}</small></div>`;
+  }).join('');
+}
+
+function formatShort(iso){
+  const d = new Date(iso+"T00:00:00");
+  return d.getDate()+"/"+(d.getMonth()+1);
+}
+
+function selectWeek(i){
+  if(WEEKS[i].holiday) return;
+  currentWeekIndex = i;
+  renderPath();
+  renderHome();
+}
+
+function renderHome(){
+  const w = WEEKS[currentWeekIndex];
+  document.getElementById('weekTitle').textContent = "Week beginning " + longDate(w.wb);
+  document.getElementById('weekMeta').textContent = w.test
+    ? `Test day: ${w.test} · List ${w.list} · ${w.words.length} words`
+    : `List ${w.list ?? '—'} · ${w.words.length} words`;
+
+  const progress = loadProgress();
+  const listEl = document.getElementById('wordlist');
+  listEl.innerHTML = w.words.map(word=>{
+    const stat = progress[wordKey(currentWeekIndex, word)];
+    let cls = "chip";
+    if(stat){
+      if(stat.correct >= 2 && stat.correct >= stat.attempts) cls += " mastered";
+      else if(stat.attempts > 0 && stat.correct < stat.attempts) cls += " weak";
+    }
+    return `<span class="${cls}">${word} <button onclick="speak('${escapeJs(word)}')" title="Hear it">🔊</button></span>`;
+  }).join('');
+}
+
+function longDate(iso){
+  const d = new Date(iso+"T00:00:00");
+  const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return d.getDate()+" "+months[d.getMonth()];
+}
+function escapeJs(s){ return s.replace(/'/g,"\\'"); }
+
+/* ---------------- SPEECH ---------------- */
+function speak(word, sentence){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const text = sentence ? sentence : word;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.85;
+  utter.lang = 'en-GB';
+  window.speechSynthesis.speak(utter);
+}
+
+/* ---------------- GAME ---------------- */
+function shuffled(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function startGame(mode){
+  const w = WEEKS[currentWeekIndex];
+  if(!w.words.length) return;
+  session = { mode, words: shuffled(w.words), index:0, stars:0, wrongList:[] };
+  document.getElementById('homeCard').style.display = 'none';
+  document.getElementById('resultScreen').classList.remove('active');
+  document.getElementById('gameScreen').classList.add('active');
+  showWord();
+}
+
+function showWord(){
+  const feedback = document.getElementById('feedback');
+  feedback.textContent = ''; feedback.className = 'feedback';
+  document.getElementById('checkBtn').style.display = 'inline-block';
+  document.getElementById('checkBtn').textContent = 'Check ✅';
+  document.getElementById('checkBtn').onclick = checkAnswer;
+
+  const total = session.words.length;
+  document.getElementById('progressLabel').textContent = `Word ${session.index+1} of ${total}`;
+  document.getElementById('scoreLabel').textContent = `⭐ ${session.stars}`;
+  document.getElementById('progressFill').style.width = ((session.index)/total*100)+'%';
+
+  const word = session.words[session.index];
+  const stage = document.getElementById('wordStage');
+  const answerArea = document.getElementById('answerArea');
+
+  if(session.mode === 'learn'){
+    stage.innerHTML = `<div class="big-word" id="bigWord">${word}</div>
+      <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>
+      <div class="muted">Look closely, then it will hide!</div>`;
+    setTimeout(()=>{
+      const bw = document.getElementById('bigWord');
+      if(bw) bw.textContent = '✦'.repeat(word.length);
+    }, 2200);
+    answerArea.innerHTML = `<input class="answer" id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word...">`;
+    document.getElementById('answerInput').focus();
+    document.getElementById('answerInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+  }
+  else if(session.mode === 'listen'){
+    stage.innerHTML = `<div style="font-size:2.4rem;">🎧</div>
+      <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>
+      <div class="muted">Listen, then spell what you hear</div>`;
+    speak(word);
+    answerArea.innerHTML = `<input class="answer" id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word...">`;
+    document.getElementById('answerInput').focus();
+    document.getElementById('answerInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+  }
+  else if(session.mode === 'choice'){
+    stage.innerHTML = `<div style="font-size:1.3rem;">🎧 What is this word?</div>
+      <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>`;
+    speak(word);
+    const options = shuffled([word, ...makeDecoys(word)]).slice(0,4);
+    answerArea.innerHTML = `<div class="choices">` +
+      options.map(o=>`<button class="choice-btn" data-word="${escapeJs(o)}" onclick="chooseOption(this,'${escapeJs(word)}')">${o}</button>`).join('') +
+      `</div>`;
+    document.getElementById('checkBtn').style.display = 'none';
+  }
+}
+
+function makeDecoys(word){
+  const decoys = new Set();
+  const w = word.toLowerCase();
+  // double a letter
+  for(let i=1;i<w.length;i++){
+    if(w[i]===w[i-1]) continue;
+    decoys.add(w.slice(0,i)+w[i]+w.slice(i));
+    if(decoys.size>=6) break;
+  }
+  // remove a letter
+  for(let i=0;i<w.length;i++){
+    decoys.add(w.slice(0,i)+w.slice(i+1));
+    if(decoys.size>=8) break;
+  }
+  // swap adjacent letters
+  for(let i=0;i<w.length-1;i++){
+    decoys.add(w.slice(0,i)+w[i+1]+w[i]+w.slice(i+2));
+  }
+  decoys.delete(w);
+  const arr = shuffled(Array.from(decoys)).filter(d=>d.length>1);
+  return arr.slice(0,3);
+}
+
+function chooseOption(btn, correctWord){
+  const buttons = document.querySelectorAll('.choice-btn');
+  buttons.forEach(b=>b.onclick=null);
+  const picked = btn.getAttribute('data-word');
+  const isCorrect = picked === correctWord;
+  buttons.forEach(b=>{
+    if(b.getAttribute('data-word')===correctWord) b.classList.add('correct');
+    else if(b===btn) b.classList.add('wrong');
+  });
+  registerResult(correctWord, isCorrect);
+  showFeedbackAndAdvance(isCorrect, correctWord);
+}
+
+function checkAnswer(){
+  const input = document.getElementById('answerInput');
+  if(!input) return;
+  const given = input.value.trim().toLowerCase();
+  const correctWord = session.words[session.index];
+  const isCorrect = given === correctWord.toLowerCase();
+  registerResult(correctWord, isCorrect);
+  showFeedbackAndAdvance(isCorrect, correctWord);
+}
+
+function skipWord(){
+  const correctWord = session.words[session.index];
+  registerResult(correctWord, false, true);
+  showFeedbackAndAdvance(false, correctWord, true);
+}
+
+function registerResult(word, isCorrect, skipped){
+  const progress = loadProgress();
+  const key = wordKey(currentWeekIndex, word);
+  const stat = progress[key] || {attempts:0, correct:0};
+  if(!skipped){
+    stat.attempts += 1;
+    if(isCorrect) stat.correct += 1;
+  }
+  progress[key] = stat;
+  saveProgress(progress);
+  if(isCorrect) session.stars += 1;
+  else session.wrongList.push(word);
+}
+
+function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
+  const feedback = document.getElementById('feedback');
+  if(skipped){
+    feedback.textContent = `Skipped — it was "${correctWord}"`;
+    feedback.className = 'feedback';
+  } else if(isCorrect){
+    feedback.textContent = "Blast off! Correct! 🚀";
+    feedback.className = 'feedback good';
+  } else {
+    feedback.textContent = `Not quite — it's "${correctWord}"`;
+    feedback.className = 'feedback bad';
+  }
+  document.getElementById('scoreLabel').textContent = `⭐ ${session.stars}`;
+  setTimeout(()=>{
+    session.index += 1;
+    if(session.index >= session.words.length) finishGame();
+    else showWord();
+  }, isCorrect ? 900 : 1500);
+}
+
+function finishGame(){
+  document.getElementById('gameScreen').classList.remove('active');
+  document.getElementById('resultScreen').classList.add('active');
+  const total = session.words.length;
+  const pct = Math.round((session.stars/total)*100);
+  const starCount = pct===100 ? 3 : pct>=70 ? 2 : pct>=40 ? 1 : 0;
+  document.getElementById('resultStars').textContent = "⭐".repeat(starCount) + "☆".repeat(3-starCount);
+  document.getElementById('resultScoreText').textContent = `${session.stars} out of ${total} correct`;
+  const uniqueWrong = Array.from(new Set(session.wrongList));
+  document.getElementById('resultWeakWords').textContent = uniqueWrong.length
+    ? "Words to practise again: " + uniqueWrong.join(", ")
+    : "Every word landed perfectly — nice flying!";
+}
+
+function restartSameMode(){
+  startGame(session.mode);
+}
+
+function backHome(){
+  document.getElementById('resultScreen').classList.remove('active');
+  document.getElementById('gameScreen').classList.remove('active');
+  document.getElementById('homeCard').style.display = 'block';
+  renderHome();
+}
+
+function quitGame(){
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  backHome();
+}
+
+/* ---------------- BOOT ---------------- */
+renderStars();
+currentWeekIndex = pickCurrentWeek();
+renderPath();
+renderHome();
+</script>
+</body>
+</html>
