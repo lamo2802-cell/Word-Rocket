@@ -208,14 +208,23 @@
   }
 
   .stage-rocket{
-    position:absolute; left:50%; bottom:18%; font-size:2rem; transform:translateX(-50%);
-    animation:blastOff 900ms ease-in forwards; pointer-events:none;
+    position:absolute; left:50%; bottom:14%; font-size:3.6rem; transform:translateX(-50%);
+    animation:blastOff 1100ms cubic-bezier(.25,.8,.3,1) forwards; pointer-events:none;
+    filter:drop-shadow(0 0 14px rgba(255,179,71,.6));
   }
   @keyframes blastOff{
-    0%{transform:translate(-50%,0) scale(.8) rotate(-8deg); opacity:1;}
-    60%{transform:translate(-50%,-70px) scale(1.1) rotate(4deg); opacity:1;}
-    100%{transform:translate(-50%,-160px) scale(.7) rotate(-4deg); opacity:0;}
+    0%{transform:translate(-50%,10px) scale(.5) rotate(-10deg); opacity:0;}
+    12%{transform:translate(-50%,0) scale(1.15) rotate(-6deg); opacity:1;}
+    30%{transform:translate(calc(-50% - 14px),-60px) scale(1.3) rotate(-14deg); opacity:1;}
+    50%{transform:translate(calc(-50% + 14px),-120px) scale(1.15) rotate(8deg); opacity:1;}
+    75%{transform:translate(calc(-50% - 8px),-190px) scale(.9) rotate(-6deg); opacity:.9;}
+    100%{transform:translate(-50%,-260px) scale(.5) rotate(4deg); opacity:0;}
   }
+  .stage-rocket .trail{
+    position:absolute; left:50%; top:100%; transform:translateX(-50%); font-size:1.6rem;
+    animation:trailFade 1100ms ease forwards;
+  }
+  @keyframes trailFade{0%{opacity:.9;}100%{opacity:0; transform:translate(-50%,20px) scale(.6);}}
 
   @keyframes scorePop{
     0%{transform:scale(1);}
@@ -274,15 +283,15 @@
     <div class="mode-grid">
       <button class="mode-btn" onclick="startGame('learn')">
         <span class="emoji">👀</span> Look &amp; Type
-        <small>See it, then type it from memory</small>
+        <small>See it, then type it from memory · +30s</small>
       </button>
       <button class="mode-btn" onclick="startGame('listen')">
         <span class="emoji">🎧</span> Listen &amp; Land
-        <small>Hear it, then spell it</small>
+        <small>Hear it, then spell it · +30s</small>
       </button>
       <button class="mode-btn" onclick="startGame('choice')">
         <span class="emoji">🛰️</span> Pick the Planet
-        <small>Choose the correct spelling</small>
+        <small>Choose the correct spelling · +15s</small>
       </button>
     </div>
 
@@ -444,7 +453,7 @@ const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","�
 /* ---------------- STATE ---------------- */
 let currentWeekIndex = 0;
 let session = null; // {mode, words:[], index, correctCount, wrong:[]}
-const SECONDS_PER_CORRECT = 30;
+const SECONDS_PER_CORRECT = { learn: 30, listen: 30, choice: 15 };
 
 /* ---------------- TIME / REWARDS ---------------- */
 function renderRewards(){
@@ -455,10 +464,10 @@ function renderRewards(){
   document.getElementById('allTimeStat').textContent = `All-time: ${allMinutes} minute${allMinutes===1?'':'s'} won`;
 }
 
-function awardWinTime(){
+function awardWinTime(seconds){
   const t = loadTime();
-  t.unredeemedSeconds += SECONDS_PER_CORRECT;
-  t.allTimeSeconds += SECONDS_PER_CORRECT;
+  t.unredeemedSeconds += seconds;
+  t.allTimeSeconds += seconds;
   saveTime(t);
   renderRewards();
 }
@@ -546,6 +555,67 @@ function speak(word, sentence){
   window.speechSynthesis.speak(utter);
 }
 
+/* ---------------- SOUND ---------------- */
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return null;
+    audioCtx = new Ctx();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTone(ctx, freq, startOffset, duration, type, peakGain){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const start = ctx.currentTime + startOffset;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + duration + 0.02);
+}
+function playCorrectSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  playTone(ctx, 523.25, 0, 0.14, 'triangle', 0.2);
+  playTone(ctx, 659.25, 0.09, 0.14, 'triangle', 0.2);
+  playTone(ctx, 987.77, 0.18, 0.22, 'triangle', 0.22);
+}
+function playWrongSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  playTone(ctx, 196, 0, 0.16, 'sawtooth', 0.13);
+  playTone(ctx, 146.8, 0.11, 0.24, 'sawtooth', 0.13);
+}
+function playBlastSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const start = ctx.currentTime;
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(70, start);
+  osc.frequency.exponentialRampToValueAtTime(720, start + 0.4);
+  gain.gain.setValueAtTime(0.001, start);
+  gain.gain.exponentialRampToValueAtTime(0.14, start + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + 0.48);
+}
+function playFanfare(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f,i)=> playTone(ctx, f, i*0.12, 0.22, 'triangle', 0.2));
+}
+
 /* ---------------- FX ---------------- */
 const CONFETTI_EMOJI = ['⭐','✨','🌟','💫'];
 function spawnConfetti(container, count){
@@ -564,12 +634,12 @@ function spawnConfetti(container, count){
   }
 }
 function celebrateStage(container){
-  spawnConfetti(container, 10);
+  spawnConfetti(container, 12);
   const rocket = document.createElement('div');
   rocket.className = 'stage-rocket';
-  rocket.textContent = '🚀';
+  rocket.innerHTML = '🚀<span class="trail">🔥</span>';
   container.appendChild(rocket);
-  setTimeout(()=>rocket.remove(), 950);
+  setTimeout(()=>rocket.remove(), 1150);
 }
 function shakeStage(container){
   container.classList.remove('shake');
@@ -714,7 +784,7 @@ function registerResult(word, isCorrect, skipped){
   saveProgress(progress);
   if(isCorrect){
     session.stars += 1;
-    awardWinTime();
+    awardWinTime(SECONDS_PER_CORRECT[session.mode] || 30);
   } else {
     session.wrongList.push(word);
   }
@@ -727,14 +797,17 @@ function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
     feedback.textContent = `Skipped — it was "${correctWord}"`;
     feedback.className = 'feedback';
   } else if(isCorrect){
-    feedback.textContent = "Blast off! Correct! 🚀 +30s YouTube";
+    feedback.textContent = `Blast off! Correct! 🚀 +${SECONDS_PER_CORRECT[session.mode] || 30}s YouTube`;
     feedback.className = 'feedback good';
     celebrateStage(stage);
     bumpScore();
+    playCorrectSound();
+    playBlastSound();
   } else {
     feedback.textContent = `Not quite — it's "${correctWord}"`;
     feedback.className = 'feedback bad';
     shakeStage(stage);
+    playWrongSound();
   }
   document.getElementById('scoreLabel').textContent = `⭐ ${session.stars}`;
   setTimeout(()=>{
@@ -762,6 +835,7 @@ function finishGame(){
   renderRewards();
   if(starCount >= 2){
     setTimeout(()=>spawnConfetti(document.getElementById('resultScreen'), 18), 300);
+    playFanfare();
   }
 }
 
