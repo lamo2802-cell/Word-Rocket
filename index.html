@@ -108,6 +108,7 @@
   .progress-fill{height:100%; background:linear-gradient(90deg,var(--flame-2),var(--flame)); width:0%; transition:width .3s ease;}
 
   .word-stage{
+    position:relative; overflow:visible;
     background:var(--navy-2); border-radius:18px; padding:34px 20px; text-align:center; margin-bottom:16px;
     min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
   }
@@ -148,9 +149,63 @@
   .exit-link{display:block; text-align:center; margin-top:6px; color:var(--ink-dim); text-decoration:underline; cursor:pointer; font-size:.85rem;}
 
   /* Results */
-  .result-screen{text-align:center;}
+  .result-screen{text-align:center; position:relative; overflow:visible;}
   .result-stars{font-size:2.6rem; margin:6px 0 12px;}
   .result-stat{font-family:'Baloo 2',cursive; font-size:1.6rem; margin-bottom:4px;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  }
+
+  @keyframes floatY{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+  .logo{display:inline-block; animation:floatY 3s ease-in-out infinite;}
+
+  @keyframes pulseGlow{
+    0%,100%{box-shadow:0 0 0 4px rgba(255,179,71,.25);}
+    50%{box-shadow:0 0 0 9px rgba(255,179,71,.1);}
+  }
+  .planet.current{animation:pulseGlow 1.8s ease-in-out infinite;}
+
+  @keyframes shakeX{
+    10%,90%{transform:translateX(-4px);}
+    20%,80%{transform:translateX(6px);}
+    30%,50%,70%{transform:translateX(-8px);}
+    40%,60%{transform:translateX(8px);}
+  }
+  .word-stage.shake{animation:shakeX .4s ease;}
+
+  .confetti-piece{
+    position:absolute; left:50%; top:50%; font-size:1.4rem; pointer-events:none;
+    animation:confettiBurst 900ms ease-out forwards; will-change:transform,opacity;
+  }
+  @keyframes confettiBurst{
+    0%{transform:translate(-50%,-50%) scale(.6) rotate(0deg); opacity:1;}
+    100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(var(--rot)); opacity:0;}
+  }
+
+  .stage-rocket{
+    position:absolute; left:50%; bottom:18%; font-size:2rem; transform:translateX(-50%);
+    animation:blastOff 900ms ease-in forwards; pointer-events:none;
+  }
+  @keyframes blastOff{
+    0%{transform:translate(-50%,0) scale(.8) rotate(-8deg); opacity:1;}
+    60%{transform:translate(-50%,-70px) scale(1.1) rotate(4deg); opacity:1;}
+    100%{transform:translate(-50%,-160px) scale(.7) rotate(-4deg); opacity:0;}
+  }
+
+  @keyframes scorePop{
+    0%{transform:scale(1);}
+    40%{transform:scale(1.35); color:var(--star);}
+    100%{transform:scale(1);}
+  }
+  #scoreLabel.score-pop{animation:scorePop 400ms ease;}
+
+  @keyframes starPop{
+    0%{opacity:0; transform:scale(0) rotate(-20deg);}
+    70%{opacity:1; transform:scale(1.25) rotate(8deg);}
+    100%{opacity:1; transform:scale(1) rotate(0deg);}
+  }
+  #resultStars span{display:inline-block; opacity:0; animation:starPop 450ms ease forwards;}
 
   footer{text-align:center; color:var(--ink-dim); font-size:.8rem; margin-top:20px;}
 </style>
@@ -463,6 +518,43 @@ function speak(word, sentence){
   window.speechSynthesis.speak(utter);
 }
 
+/* ---------------- FX ---------------- */
+const CONFETTI_EMOJI = ['⭐','✨','🌟','💫'];
+function spawnConfetti(container, count){
+  for(let i=0;i<count;i++){
+    const span = document.createElement('span');
+    span.className = 'confetti-piece';
+    span.textContent = CONFETTI_EMOJI[Math.floor(Math.random()*CONFETTI_EMOJI.length)];
+    const angle = Math.random()*2*Math.PI;
+    const dist = 50 + Math.random()*70;
+    span.style.setProperty('--dx', (Math.cos(angle)*dist)+'px');
+    span.style.setProperty('--dy', (Math.sin(angle)*dist - 30)+'px');
+    span.style.setProperty('--rot', (Math.random()*360-180)+'deg');
+    span.style.animationDelay = (Math.random()*120)+'ms';
+    container.appendChild(span);
+    setTimeout(()=>span.remove(), 1100);
+  }
+}
+function celebrateStage(container){
+  spawnConfetti(container, 10);
+  const rocket = document.createElement('div');
+  rocket.className = 'stage-rocket';
+  rocket.textContent = '🚀';
+  container.appendChild(rocket);
+  setTimeout(()=>rocket.remove(), 950);
+}
+function shakeStage(container){
+  container.classList.remove('shake');
+  void container.offsetWidth; // restart animation
+  container.classList.add('shake');
+}
+function bumpScore(){
+  const el = document.getElementById('scoreLabel');
+  el.classList.remove('score-pop');
+  void el.offsetWidth;
+  el.classList.add('score-pop');
+}
+
 /* ---------------- GAME ---------------- */
 function shuffled(arr){
   const a = arr.slice();
@@ -599,15 +691,19 @@ function registerResult(word, isCorrect, skipped){
 
 function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
   const feedback = document.getElementById('feedback');
+  const stage = document.getElementById('wordStage');
   if(skipped){
     feedback.textContent = `Skipped — it was "${correctWord}"`;
     feedback.className = 'feedback';
   } else if(isCorrect){
     feedback.textContent = "Blast off! Correct! 🚀";
     feedback.className = 'feedback good';
+    celebrateStage(stage);
+    bumpScore();
   } else {
     feedback.textContent = `Not quite — it's "${correctWord}"`;
     feedback.className = 'feedback bad';
+    shakeStage(stage);
   }
   document.getElementById('scoreLabel').textContent = `⭐ ${session.stars}`;
   setTimeout(()=>{
@@ -624,13 +720,19 @@ function finishGame(){
   const total = session.words.length;
   const pct = Math.round((session.stars/total)*100);
   const starCount = pct===100 ? 3 : pct>=70 ? 2 : pct>=40 ? 1 : 0;
-  document.getElementById('resultStars').textContent = "⭐".repeat(starCount) + "☆".repeat(3-starCount);
+  const starsEl = document.getElementById('resultStars');
+  starsEl.innerHTML = [0,1,2].map(i=>
+    `<span style="animation-delay:${i*180}ms;">${i<starCount ? '⭐' : '☆'}</span>`
+  ).join('');
   document.getElementById('resultScoreText').textContent = `${session.stars} out of ${total} correct`;
   const uniqueWrong = Array.from(new Set(session.wrongList));
   document.getElementById('resultWeakWords').textContent = uniqueWrong.length
     ? "Words to practise again: " + uniqueWrong.join(", ")
     : "Every word landed perfectly — nice flying!";
   renderRewards();
+  if(starCount >= 2){
+    setTimeout(()=>spawnConfetti(document.getElementById('resultScreen'), 18), 300);
+  }
 }
 
 function restartSameMode(){
