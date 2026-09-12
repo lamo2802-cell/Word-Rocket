@@ -453,6 +453,7 @@ const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","�
 /* ---------------- STATE ---------------- */
 let currentWeekIndex = 0;
 let session = null; // {mode, words:[], index, correctCount, wrong:[]}
+let learnHideTimer = null;
 const SECONDS_PER_CORRECT = { learn: 30, listen: 30, choice: 15 };
 
 /* ---------------- TIME / REWARDS ---------------- */
@@ -654,6 +655,16 @@ function bumpScore(){
 }
 
 /* ---------------- GAME ---------------- */
+function revealWordAgain(word){
+  const bw = document.getElementById('bigWord');
+  if(bw) bw.textContent = word;
+  clearTimeout(learnHideTimer);
+  const showMs = Math.max(4500, word.length * 500);
+  learnHideTimer = setTimeout(()=>{
+    if(bw) bw.textContent = '✦'.repeat(word.length);
+  }, showMs);
+}
+
 function shuffled(arr){
   const a = arr.slice();
   for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
@@ -672,6 +683,7 @@ function startGame(mode){
 }
 
 function showWord(){
+  clearTimeout(learnHideTimer);
   const feedback = document.getElementById('feedback');
   feedback.textContent = ''; feedback.className = 'feedback';
   document.getElementById('checkBtn').style.display = 'inline-block';
@@ -689,12 +701,16 @@ function showWord(){
 
   if(session.mode === 'learn'){
     stage.innerHTML = `<div class="big-word" id="bigWord">${word}</div>
-      <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>
+      <div style="display:flex; gap:10px;">
+        <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>
+        <button class="speak-btn" onclick="revealWordAgain('${escapeJs(word)}')" title="Show it again">👁️</button>
+      </div>
       <div class="muted">Look closely, then it will hide!</div>`;
-    setTimeout(()=>{
+    const showMs = Math.max(4500, word.length * 500);
+    learnHideTimer = setTimeout(()=>{
       const bw = document.getElementById('bigWord');
       if(bw) bw.textContent = '✦'.repeat(word.length);
-    }, 2200);
+    }, showMs);
     answerArea.innerHTML = `<input class="answer" id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word...">`;
     document.getElementById('answerInput').focus();
     document.getElementById('answerInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
@@ -860,7 +876,7 @@ function quitGame(){
 /* ---------------- BOOT ---------------- */
 Object.assign(window, {
   selectWeek, startGame, speak, skipWord, checkAnswer,
-  chooseOption, backHome, restartSameMode, quitGame
+  chooseOption, backHome, restartSameMode, quitGame, revealWordAgain
 });
 
 async function boot(){
