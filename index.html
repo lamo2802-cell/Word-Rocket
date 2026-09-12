@@ -150,6 +150,23 @@
   }
   input.answer:focus{outline:none; border-color:var(--flame);}
 
+  .answer-display{
+    width:100%; min-height:58px; font-family:'Baloo 2',cursive; font-size:1.8rem; letter-spacing:4px;
+    text-align:center; padding:10px 14px; border-radius:14px; border:2px solid #3a4080; background:var(--navy);
+    color:var(--ink); margin-bottom:14px; display:flex; align-items:center; justify-content:center;
+    flex-wrap:wrap; gap:2px; word-break:break-all;
+  }
+  .answer-display .placeholder{color:var(--ink-dim); font-size:.95rem; letter-spacing:normal;}
+  .vkeyboard{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
+  .vk-row{display:flex; justify-content:center; gap:5px;}
+  .vk-key{
+    flex:1; max-width:40px; height:44px; border-radius:10px; background:var(--navy-2);
+    border:2px solid #3a4080; color:var(--ink); font-family:'Baloo 2',cursive; font-size:1.05rem;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; text-transform:uppercase;
+  }
+  .vk-key:active{background:#2c3268; transform:translateY(2px);}
+  .vk-key.wide{flex:1.8; max-width:none; font-size:1.2rem;}
+
   .choices{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
   .choice-btn{
     background:var(--navy); border:2px solid #3a4080; color:var(--ink); border-radius:14px; padding:14px;
@@ -682,6 +699,42 @@ function startGame(mode){
   showWord();
 }
 
+let typedAnswer = '';
+const VK_ROWS = [
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l'],
+  ['z','x','c','v','b','n','m']
+];
+function buildVirtualKeyboardHtml(){
+  return `<div class="vkeyboard">` + VK_ROWS.map((row,i)=>{
+    let keys = row.map(l=>`<button type="button" class="vk-key" onclick="vkPress('${l}')">${l}</button>`).join('');
+    if(i === VK_ROWS.length - 1){
+      keys += `<button type="button" class="vk-key wide" onclick="vkBackspace()">⌫</button>`;
+    }
+    return `<div class="vk-row">${keys}</div>`;
+  }).join('') + `</div>`;
+}
+function renderAnswerDisplay(){
+  const el = document.getElementById('answerDisplay');
+  if(!el) return;
+  el.innerHTML = typedAnswer.length
+    ? typedAnswer.split('').map(c=>`<span>${c}</span>`).join('')
+    : `<span class="placeholder">Tap the letters below…</span>`;
+}
+function buildTypingAnswerArea(){
+  typedAnswer = '';
+  return `<div class="answer-display" id="answerDisplay"><span class="placeholder">Tap the letters below…</span></div>`
+    + buildVirtualKeyboardHtml();
+}
+function vkPress(letter){
+  typedAnswer += letter;
+  renderAnswerDisplay();
+}
+function vkBackspace(){
+  typedAnswer = typedAnswer.slice(0, -1);
+  renderAnswerDisplay();
+}
+
 function showWord(){
   clearTimeout(learnHideTimer);
   const feedback = document.getElementById('feedback');
@@ -711,18 +764,14 @@ function showWord(){
       const bw = document.getElementById('bigWord');
       if(bw) bw.textContent = '✦'.repeat(word.length);
     }, showMs);
-    answerArea.innerHTML = `<input class="answer" id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word...">`;
-    document.getElementById('answerInput').focus();
-    document.getElementById('answerInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+    answerArea.innerHTML = buildTypingAnswerArea();
   }
   else if(session.mode === 'listen'){
     stage.innerHTML = `<div style="font-size:2.4rem;">🎧</div>
       <button class="speak-btn" onclick="speak('${escapeJs(word)}')">🔊</button>
       <div class="muted">Listen, then spell what you hear</div>`;
     speak(word);
-    answerArea.innerHTML = `<input class="answer" id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word...">`;
-    document.getElementById('answerInput').focus();
-    document.getElementById('answerInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+    answerArea.innerHTML = buildTypingAnswerArea();
   }
   else if(session.mode === 'choice'){
     stage.innerHTML = `<div style="font-size:1.3rem;">🎧 What is this word?</div>
@@ -773,9 +822,8 @@ function chooseOption(btn, correctWord){
 }
 
 function checkAnswer(){
-  const input = document.getElementById('answerInput');
-  if(!input) return;
-  const given = input.value.trim().toLowerCase();
+  if(!typedAnswer.length) return;
+  const given = typedAnswer.trim().toLowerCase();
   const correctWord = session.words[session.index];
   const isCorrect = given === correctWord.toLowerCase();
   registerResult(correctWord, isCorrect);
@@ -876,7 +924,8 @@ function quitGame(){
 /* ---------------- BOOT ---------------- */
 Object.assign(window, {
   selectWeek, startGame, speak, skipWord, checkAnswer,
-  chooseOption, backHome, restartSameMode, quitGame, revealWordAgain
+  chooseOption, backHome, restartSameMode, quitGame, revealWordAgain,
+  vkPress, vkBackspace
 });
 
 async function boot(){
