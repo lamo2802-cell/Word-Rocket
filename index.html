@@ -171,14 +171,11 @@
   </div>
 
   <div class="card" id="rewardsCard">
-    <h2>🎬 YouTube minutes earned</h2>
+    <h2>🎬 YouTube minutes won</h2>
     <p class="muted">1 minute of Word Rocket = 1 minute of YouTube</p>
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-      <div>
-        <div class="result-stat" id="earnedMinutes" style="font-size:2.4rem; margin-bottom:0;">0</div>
-        <div class="muted" style="margin:0;">minutes ready to spend</div>
-      </div>
-      <button class="btn btn-secondary" style="flex:none; padding:12px 18px;" onclick="redeemMinutes()">Watched them ✅</button>
+    <div>
+      <div class="result-stat" id="earnedMinutes" style="font-size:2.4rem; margin-bottom:0;">0</div>
+      <div class="muted" style="margin:0;">minutes ready to spend</div>
     </div>
     <p class="muted" id="allTimeStat" style="margin:12px 0 0;"></p>
   </div>
@@ -380,15 +377,6 @@ function endSessionTimer(){
   t.allTimeSeconds += elapsed;
   saveTime(t);
   sessionStartMs = null;
-  renderRewards();
-}
-
-function redeemMinutes(){
-  const t = loadTime();
-  const minutes = Math.floor(t.unredeemedSeconds/60);
-  if(minutes <= 0) return;
-  t.unredeemedSeconds = t.unredeemedSeconds - (minutes*60);
-  saveTime(t);
   renderRewards();
 }
 
@@ -670,7 +658,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.hidden) endSessi
 
 Object.assign(window, {
   selectWeek, startGame, speak, skipWord, checkAnswer,
-  chooseOption, redeemMinutes, backHome, restartSameMode, quitGame
+  chooseOption, backHome, restartSameMode, quitGame
 });
 
 async function boot(){

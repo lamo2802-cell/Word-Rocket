@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Word Rocket — Parent View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1B1F3B; --navy-2:#262c52; --panel:#252a4d;
+    --flame:#FFB347; --flame-2:#FF8A3D; --teal:#4ECDC4;
+    --ink:#F7F7FF; --ink-dim:#B9BEE8; --good:#6BCB77; --bad:#FF6B6B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; font-family:'Nunito',sans-serif; color:var(--ink);
+    background:
+      radial-gradient(ellipse at 20% 0%, #2c3268 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, #2a2f5c 0%, transparent 50%),
+      var(--navy);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .card{
+    background:var(--panel); border:1px solid #363c6e; border-radius:22px;
+    padding:30px 26px; max-width:420px; width:100%; text-align:center;
+  }
+  h1{font-family:'Baloo 2',cursive; font-size:1.5rem; margin:0 0 4px;}
+  h1 span{color:var(--flame);}
+  .sub{color:var(--ink-dim); font-size:.9rem; margin:0 0 22px;}
+  .minutes{font-family:'Baloo 2',cursive; font-size:3.4rem; margin:6px 0 2px;}
+  .minutes-label{color:var(--ink-dim); font-size:.9rem; margin-bottom:20px;}
+  .stat-row{
+    display:flex; justify-content:space-between; background:var(--navy-2);
+    border-radius:14px; padding:12px 16px; margin-bottom:10px; font-size:.9rem;
+  }
+  .stat-row b{font-family:'Baloo 2',cursive; font-weight:700;}
+  .btn{
+    width:100%; padding:14px; border-radius:14px; border:none; margin-top:16px;
+    font-family:'Baloo 2',cursive; font-size:1.05rem; cursor:pointer;
+  }
+  .btn-reset{background:linear-gradient(180deg,var(--flame),var(--flame-2)); color:#12162e; box-shadow:0 4px 0 #b85f1c;}
+  .btn-reset:active{transform:translateY(3px); box-shadow:0 1px 0 #b85f1c;}
+  .btn-reset:disabled{opacity:.4; cursor:default; box-shadow:none;}
+  .status{margin-top:14px; font-size:.82rem; color:var(--ink-dim); min-height:18px;}
+  .status.good{color:var(--good);}
+  .note{margin-top:22px; font-size:.75rem; color:var(--ink-dim); line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Word <span>Rocket</span> — parent view</h1>
+    <p class="sub">Check and reset Henry's YouTube minutes</p>
+
+    <div class="minutes" id="minutesDisplay">—</div>
+    <div class="minutes-label">minutes won, not yet spent</div>
+
+    <div class="stat-row"><span>All-time minutes played</span><b id="allTime">—</b></div>
+    <div class="stat-row"><span>Last updated</span><b id="lastUpdated">—</b></div>
+
+    <button class="btn btn-reset" id="resetBtn" disabled>Reset to 0 (he's watched them)</button>
+    <div class="status" id="status">Connecting…</div>
+
+    <p class="note">This page isn't password protected — it's just not linked from Henry's game. Don't share this URL with him.</p>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBlJVbJwBHxakLA20gkgO-SlBUskHFTrHA",
+  authDomain: "word-rocket-7b3a5.firebaseapp.com",
+  projectId: "word-rocket-7b3a5",
+  storageBucket: "word-rocket-7b3a5.firebasestorage.app",
+  messagingSenderId: "833151950185",
+  appId: "1:833151950185:web:e025dd738f95f7ede931f8"
+};
+
+const PLAYER_ID = "henry";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const playerRef = doc(db, "players", PLAYER_ID);
+
+const minutesEl = document.getElementById('minutesDisplay');
+const allTimeEl = document.getElementById('allTime');
+const lastUpdatedEl = document.getElementById('lastUpdated');
+const resetBtn = document.getElementById('resetBtn');
+const statusEl = document.getElementById('status');
+
+let latest = null;
+
+onSnapshot(playerRef, (snap)=>{
+  if(!snap.exists()){
+    statusEl.textContent = "No data yet — Henry hasn't played on a synced device.";
+    return;
+  }
+  const data = snap.data();
+  latest = data;
+  const time = data.time || {unredeemedSeconds:0, allTimeSeconds:0};
+  minutesEl.textContent = Math.floor(time.unredeemedSeconds/60);
+  allTimeEl.textContent = Math.floor(time.allTimeSeconds/60) + " min";
+  lastUpdatedEl.textContent = data.updatedAt ? new Date(data.updatedAt).toLocaleString('en-GB', {dateStyle:'short', timeStyle:'short'}) : "—";
+  resetBtn.disabled = false;
+  statusEl.textContent = "Live — updates automatically";
+  statusEl.className = "status good";
+}, (err)=>{
+  console.error(err);
+  statusEl.textContent = "Couldn't connect — check your internet connection.";
+});
+
+resetBtn.addEventListener('click', async ()=>{
+  if(!latest) return;
+  const currentMinutes = Math.floor((latest.time?.unredeemedSeconds || 0)/60);
+  if(currentMinutes <= 0) return;
+  if(!confirm(`Reset Henry's ${currentMinutes} YouTube minute(s) to 0?`)) return;
+  resetBtn.disabled = true;
+  statusEl.textContent = "Resetting…";
+  try{
+    const newTime = { ...(latest.time || {}), unredeemedSeconds: 0 };
+    await setDoc(playerRef, { ...latest, time: newTime, updatedAt: new Date().toISOString() });
+    statusEl.textContent = "Reset done ✅";
+    statusEl.className = "status good";
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = "Reset failed — try again.";
+  }
+});
+</script>
+</body>
+</html>
