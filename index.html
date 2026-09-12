@@ -163,6 +163,19 @@
     <div class="path" id="path"></div>
   </div>
 
+  <div class="card" id="rewardsCard">
+    <h2>🎬 YouTube minutes earned</h2>
+    <p class="muted">1 minute of Word Rocket = 1 minute of YouTube</p>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div>
+        <div class="result-stat" id="earnedMinutes" style="font-size:2.4rem; margin-bottom:0;">0</div>
+        <div class="muted" style="margin:0;">minutes ready to spend</div>
+      </div>
+      <button class="btn btn-secondary" style="flex:none; padding:12px 18px;" onclick="redeemMinutes()">Watched them ✅</button>
+    </div>
+    <p class="muted" id="allTimeStat" style="margin:12px 0 0;"></p>
+  </div>
+
   <div class="card" id="homeCard">
     <h2 id="weekTitle">This week's mission</h2>
     <p class="muted" id="weekMeta">Loading…</p>
@@ -262,7 +275,44 @@ const PLANET_EMOJI = ["🪐","🌍","🌕","🌑","🌟","🛸","🌌","🪨","�
 /* ---------------- STATE ---------------- */
 let currentWeekIndex = 0;
 let session = null; // {mode, words:[], index, correctCount, wrong:[]}
+let sessionStartMs = null;
 const STORAGE_KEY = "wordRocketProgress_v1";
+const TIME_KEY = "wordRocketTime_v1";
+
+/* ---------------- TIME / REWARDS ---------------- */
+function loadTime(){
+  try{ return JSON.parse(localStorage.getItem(TIME_KEY)) || {unredeemedSeconds:0, allTimeSeconds:0}; }
+  catch(e){ return {unredeemedSeconds:0, allTimeSeconds:0}; }
+}
+function saveTime(t){ localStorage.setItem(TIME_KEY, JSON.stringify(t)); }
+
+function renderRewards(){
+  const t = loadTime();
+  const minutes = Math.floor(t.unredeemedSeconds/60);
+  document.getElementById('earnedMinutes').textContent = minutes;
+  const allMinutes = Math.floor(t.allTimeSeconds/60);
+  document.getElementById('allTimeStat').textContent = `All-time: ${allMinutes} minute${allMinutes===1?'':'s'} played`;
+}
+
+function endSessionTimer(){
+  if(sessionStartMs === null) return;
+  const elapsed = Math.max(0, Math.round((Date.now() - sessionStartMs)/1000));
+  const t = loadTime();
+  t.unredeemedSeconds += elapsed;
+  t.allTimeSeconds += elapsed;
+  saveTime(t);
+  sessionStartMs = null;
+  renderRewards();
+}
+
+function redeemMinutes(){
+  const t = loadTime();
+  const minutes = Math.floor(t.unredeemedSeconds/60);
+  if(minutes <= 0) return;
+  t.unredeemedSeconds = t.unredeemedSeconds - (minutes*60);
+  saveTime(t);
+  renderRewards();
+}
 
 function loadProgress(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }catch(e){ return {}; }
@@ -364,7 +414,9 @@ function startGame(mode){
   const w = WEEKS[currentWeekIndex];
   if(!w.words.length) return;
   session = { mode, words: shuffled(w.words), index:0, stars:0, wrongList:[] };
+  sessionStartMs = Date.now();
   document.getElementById('homeCard').style.display = 'none';
+  document.getElementById('rewardsCard').style.display = 'none';
   document.getElementById('resultScreen').classList.remove('active');
   document.getElementById('gameScreen').classList.add('active');
   showWord();
@@ -506,6 +558,7 @@ function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
 }
 
 function finishGame(){
+  endSessionTimer();
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('resultScreen').classList.add('active');
   const total = session.words.length;
@@ -517,6 +570,7 @@ function finishGame(){
   document.getElementById('resultWeakWords').textContent = uniqueWrong.length
     ? "Words to practise again: " + uniqueWrong.join(", ")
     : "Every word landed perfectly — nice flying!";
+  renderRewards();
 }
 
 function restartSameMode(){
@@ -527,19 +581,26 @@ function backHome(){
   document.getElementById('resultScreen').classList.remove('active');
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('homeCard').style.display = 'block';
+  document.getElementById('rewardsCard').style.display = 'block';
   renderHome();
+  renderRewards();
 }
 
 function quitGame(){
   window.speechSynthesis && window.speechSynthesis.cancel();
+  endSessionTimer();
   backHome();
 }
 
 /* ---------------- BOOT ---------------- */
+window.addEventListener('beforeunload', endSessionTimer);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) endSessionTimer(); });
+
 renderStars();
 currentWeekIndex = pickCurrentWeek();
 renderPath();
 renderHome();
+renderRewards();
 </script>
 </body>
 </html>
