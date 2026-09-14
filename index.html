@@ -174,7 +174,7 @@
   }
   .choice-btn:hover{border-color:var(--flame);}
   .choice-btn.correct{background:rgba(107,203,119,.25); border-color:var(--good);}
-  .choice-btn.wrong{background:rgba(255,107,107,.25); border-color:var(--bad);}
+  .choice-btn.wrong{background:rgba(78,205,196,.12); border-color:var(--teal); opacity:.7;}
 
   .actions{display:flex; gap:10px;}
   .btn{
@@ -186,7 +186,7 @@
   .btn-secondary{background:var(--navy-2); color:var(--ink); border:2px solid #3a4080;}
   .feedback{min-height:30px; text-align:center; font-family:'Baloo 2',cursive; font-size:1.1rem; margin-bottom:8px;}
   .feedback.good{color:var(--good);}
-  .feedback.bad{color:var(--bad);}
+  .feedback.bad{color:var(--teal);}
   .exit-link{display:block; text-align:center; margin-top:6px; color:var(--ink-dim); text-decoration:underline; cursor:pointer; font-size:.85rem;}
 
   /* Results */
@@ -207,13 +207,13 @@
   }
   .planet.current{animation:pulseGlow 1.8s ease-in-out infinite;}
 
-  @keyframes shakeX{
-    10%,90%{transform:translateX(-4px);}
-    20%,80%{transform:translateX(6px);}
-    30%,50%,70%{transform:translateX(-8px);}
-    40%,60%{transform:translateX(8px);}
+  @keyframes softPulse{
+    0%{box-shadow:0 0 0 0 rgba(78,205,196,.35);}
+    50%{box-shadow:0 0 0 10px rgba(78,205,196,0);}
+    100%{box-shadow:0 0 0 0 rgba(78,205,196,0);}
   }
-  .word-stage.shake{animation:shakeX .4s ease;}
+  .word-stage.pulse{animation:softPulse .8s ease;}
+  .sounding-out{font-family:'Baloo 2',cursive; font-size:1.3rem; letter-spacing:1px; color:var(--teal); margin-top:4px;}
 
   .confetti-piece{
     position:absolute; left:50%; top:50%; font-size:1.4rem; pointer-events:none;
@@ -608,8 +608,8 @@ function playCorrectSound(){
 function playWrongSound(){
   const ctx = getAudioCtx();
   if(!ctx) return;
-  playTone(ctx, 196, 0, 0.16, 'sawtooth', 0.13);
-  playTone(ctx, 146.8, 0.11, 0.24, 'sawtooth', 0.13);
+  playTone(ctx, 392, 0, 0.16, 'sine', 0.12);
+  playTone(ctx, 329.63, 0.13, 0.22, 'sine', 0.12);
 }
 function playBlastSound(){
   const ctx = getAudioCtx();
@@ -632,6 +632,56 @@ function playFanfare(){
   const ctx = getAudioCtx();
   if(!ctx) return;
   [523.25, 659.25, 783.99, 1046.5].forEach((f,i)=> playTone(ctx, f, i*0.12, 0.22, 'triangle', 0.2));
+}
+
+/* ---------------- SYLLABLES (for gentle "sound it out" feedback) ---------------- */
+const SYLLABLES = {
+  gardening:"gar-den-ing", gardener:"gar-den-er", limited:"lim-it-ed", limiting:"lim-it-ing",
+  developed:"de-vel-oped", listening:"lis-ten-ing", listened:"lis-tened", covered:"cov-ered",
+  covering:"cov-er-ing", accident:"ac-ci-dent", accidentally:"ac-ci-den-tal-ly", library:"li-brar-y",
+  forgetting:"for-get-ting", forgotten:"for-got-ten", beginning:"be-gin-ning", preferred:"pre-ferred",
+  permitted:"per-mit-ted", regretting:"re-gret-ting", forbidden:"for-bid-den", propelled:"pro-pelled",
+  equipped:"e-quipped", actual:"ac-tu-al", actually:"ac-tu-al-ly", island:"is-land",
+  calmly:"calm-ly", exactly:"ex-act-ly", deadly:"dead-ly", bravely:"brave-ly", gladly:"glad-ly",
+  deeply:"deep-ly", clearly:"clear-ly", hourly:"hour-ly", quickly:"quick-ly", address:"ad-dress",
+  although:"al-though", knowledge:"knowl-edge",
+  gently:"gent-ly", simply:"sim-ply", humbly:"hum-bly", terribly:"ter-ri-bly",
+  incredibly:"in-cred-i-bly", responsibly:"re-spon-si-bly", wrinkly:"wrin-kly", possibly:"pos-si-bly",
+  durably:"dur-a-bly", breath:"breath", breathe:"breathe", purpose:"pur-pose",
+  truly:"tru-ly", daily:"dai-ly", slyly:"sly-ly", shyly:"shy-ly", fully:"ful-ly", wholly:"whol-ly",
+  coyly:"coy-ly", happily:"hap-pi-ly", duly:"du-ly", appear:"ap-pear", disappear:"dis-ap-pear", learn:"learn",
+  basically:"ba-sic-al-ly", frantically:"fran-tic-al-ly", historically:"his-tor-ic-al-ly",
+  dramatically:"dra-mat-ic-al-ly", automatically:"au-to-mat-ic-al-ly", tragically:"trag-ic-al-ly",
+  magically:"mag-ic-al-ly", specifically:"spe-cif-ic-al-ly", logically:"log-ic-al-ly",
+  bicycle:"bi-cy-cle", build:"build", material:"ma-te-ri-al",
+  arrival:"ar-riv-al", comical:"com-ic-al", emotional:"e-mo-tion-al", national:"na-tion-al",
+  magical:"mag-ic-al", personal:"per-son-al", optional:"op-tion-al", survival:"sur-viv-al",
+  tropical:"trop-ic-al", arrive:"ar-rive", believe:"be-lieve", length:"length",
+  battle:"bat-tle", article:"ar-ti-cle", struggle:"strug-gle", possible:"pos-si-ble",
+  capable:"ca-pa-ble", settle:"set-tle", humble:"hum-ble", terrible:"ter-ri-ble",
+  example:"ex-am-ple", busy:"bus-y", business:"busi-ness", medicine:"med-i-cine",
+  measure:"meas-ure", treasure:"treas-ure", pleasure:"pleas-ure", enclosure:"en-clo-sure",
+  pressure:"pres-sure", composure:"com-po-sure", exposure:"ex-po-sure", closure:"clo-sure",
+  leisure:"lei-sure", calendar:"cal-en-dar", caught:"caught", mention:"men-tion",
+  creature:"crea-ture", furniture:"fur-ni-ture", picture:"pic-ture", adventure:"ad-ven-ture",
+  capture:"cap-ture", nature:"na-ture", future:"fu-ture", sculpture:"sculp-ture",
+  mixture:"mix-ture", centre:"cen-tre", century:"cen-tu-ry", minute:"min-ute",
+  teacher:"teach-er", catcher:"catch-er", richer:"rich-er", stretcher:"stretch-er",
+  watcher:"watch-er", butcher:"butch-er", preacher:"preach-er", cruncher:"crunch-er",
+  scorcher:"scorch-er", certain:"cer-tain", circle:"cir-cle", natural:"nat-u-ral",
+  confusion:"con-fu-sion", division:"di-vi-sion", invasion:"in-va-sion", erosion:"e-ro-sion",
+  collision:"col-li-sion", decision:"de-ci-sion", fusion:"fu-sion", revision:"re-vi-sion",
+  consider:"con-sid-er", continue:"con-tin-ue", naughty:"naugh-ty",
+  decide:"de-cide", describe:"de-scribe", often:"of-ten", disobey:"dis-o-bey",
+  disagree:"dis-a-gree", disapprove:"dis-ap-prove", dislike:"dis-like",
+  dislocate:"dis-lo-cate", answer:"an-swer", complete:"com-plete", notice:"no-tice",
+  redo:"re-do", return:"re-turn", refresh:"re-fresh", reaction:"re-ac-tion",
+  reappear:"re-ap-pear", revenge:"re-venge", review:"re-view", replay:"re-play",
+  redecorate:"re-dec-o-rate", rebound:"re-bound", different:"dif-fer-ent",
+  difficult:"dif-fi-cult", opposite:"op-po-site"
+};
+function soundItOut(word){
+  return SYLLABLES[word.toLowerCase()] || word;
 }
 
 /* ---------------- FX ---------------- */
@@ -659,10 +709,10 @@ function celebrateStage(container){
   container.appendChild(rocket);
   setTimeout(()=>rocket.remove(), 1150);
 }
-function shakeStage(container){
-  container.classList.remove('shake');
+function pulseStageNeutral(container){
+  container.classList.remove('pulse');
   void container.offsetWidth; // restart animation
-  container.classList.add('shake');
+  container.classList.add('pulse');
 }
 function bumpScore(){
   const el = document.getElementById('scoreLabel');
@@ -868,9 +918,9 @@ function showFeedbackAndAdvance(isCorrect, correctWord, skipped){
     playCorrectSound();
     playBlastSound();
   } else {
-    feedback.textContent = `Not quite — it's "${correctWord}"`;
+    feedback.innerHTML = `Let's sound it out: <span class="sounding-out">${soundItOut(correctWord)}</span>`;
     feedback.className = 'feedback bad';
-    shakeStage(stage);
+    pulseStageNeutral(stage);
     playWrongSound();
   }
   document.getElementById('scoreLabel').textContent = `⭐ ${session.stars}`;
